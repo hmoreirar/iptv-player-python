@@ -6,10 +6,11 @@ Reproductor de IPTV de escritorio construido con PySide6 y mpv.
 
 - Carga de playlists M3U locales y por URL
 - Busqueda y filtrado por categorias
-- Favoritos (memoria de la sesion)
+- Favoritos persistentes entre sesiones
 - Modo TV a pantalla completa con navegacion por teclado
 - Carga asincrona de canales y logos
 - Parser M3U robusto con soporte de URLs relativas
+- Persistencia de configuracion (volumen, geometria de ventana, ultima playlist)
 
 ## Dependencias del sistema
 

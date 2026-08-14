@@ -1,6 +1,6 @@
 import sys
 
-from PySide6.QtCore import QSize, Qt, QUrl
+from PySide6.QtCore import QSize, Qt, QUrl, QSettings
 from PySide6.QtGui import QIcon, QPixmap
 from PySide6.QtNetwork import QNetworkAccessManager, QNetworkReply, QNetworkRequest
 from PySide6.QtWidgets import (
@@ -78,6 +78,8 @@ class IPTVPlayer(QMainWindow):
         self.setWindowTitle("IPTV Player")
         self.resize(1200, 700)
 
+        self.settings = QSettings("IPTVPlayer", "IPTVPlayer")
+
         self.channels = []
         self.current_filter = None
         self.search_term = ""
@@ -89,6 +91,7 @@ class IPTVPlayer(QMainWindow):
         self.category_buttons = {}
 
         self.setup_ui()
+        self._load_settings()
 
     # =========================
     # INTERFAZ
@@ -295,6 +298,9 @@ class IPTVPlayer(QMainWindow):
         self.setEnabled(False)
         self.status_label.setText("")
 
+        self._pending_source = source
+        self._pending_is_url = is_url
+
         self.loader = PlaylistLoader(source, is_url)
         self.loader.finished.connect(self._on_load_finished)
         self.loader.failed.connect(self._on_load_failed)
@@ -303,14 +309,19 @@ class IPTVPlayer(QMainWindow):
     def _on_load_finished(self, channels):
         self.setEnabled(True)
         self.loading_label.setVisible(False)
+
+        source = self._pending_source
+        is_url = self._pending_is_url
         self.loader = None
+        self._pending_source = None
+        self._pending_is_url = None
 
         self.channels = channels
         self.current_filter = None
         self.search_term = ""
         self.search.clear()
-        self.favorites = set()
 
+        self._save_playlist_source(source, is_url)
         self._rebuild_categories()
         self._apply_filters()
 
@@ -318,6 +329,8 @@ class IPTVPlayer(QMainWindow):
         self.setEnabled(True)
         self.loading_label.setVisible(False)
         self.loader = None
+        self._pending_source = None
+        self._pending_is_url = None
 
         QMessageBox.critical(
             self,
@@ -441,6 +454,7 @@ class IPTVPlayer(QMainWindow):
             self.favorites.add(url)
             message = f"Añadido a favoritos: {channel['name']}"
 
+        self._save_settings()
         self.status_label.setText(message)
 
         if self.current_filter == FAVORITES:
@@ -513,6 +527,7 @@ class IPTVPlayer(QMainWindow):
 
     def on_volume_changed(self, value):
         self.player.set_volume(value)
+        self.settings.setValue("player/volume", value)
 
     def toggle_mute(self):
         self.player.toggle_mute()
@@ -594,10 +609,41 @@ class IPTVPlayer(QMainWindow):
         QMessageBox.warning(self, "Error de reproducción", message)
 
     # =========================
+    # PERSISTENCIA
+    # =========================
+
+    def _load_settings(self):
+        geometry = self.settings.value("window/geometry")
+        if geometry is not None:
+            self.restoreGeometry(geometry)
+
+        volume = self.settings.value("player/volume", 100, type=int)
+        self.volume_slider.setValue(volume)
+
+        favorites = self.settings.value("favorites/urls", [], type=list)
+        self.favorites = set(favorites)
+
+        self._last_source = self.settings.value("playlist/last_source", "")
+        self._last_is_url = self.settings.value("playlist/last_is_url", False, type=bool)
+
+    def _save_settings(self):
+        self.settings.setValue("window/geometry", self.saveGeometry())
+        self.settings.setValue("player/volume", self.volume_slider.value())
+        self.settings.setValue("favorites/urls", list(self.favorites))
+
+    def _save_playlist_source(self, source, is_url):
+        self._last_source = source
+        self._last_is_url = is_url
+        self.settings.setValue("playlist/last_source", source)
+        self.settings.setValue("playlist/last_is_url", is_url)
+
+    # =========================
     # CERRAR APLICACIÓN
     # =========================
 
     def closeEvent(self, event):
+        self._save_settings()
+
         if self.player:
             self.player.destroy()
 
