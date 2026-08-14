@@ -196,6 +196,7 @@ class IPTVPlayer(QMainWindow):
 
         self.video = QWidget()
         self.video.setMinimumHeight(450)
+        self.video.setAttribute(Qt.WidgetAttribute.WA_NativeWindow)
         self.video.setStyleSheet(
             """
             QWidget {
