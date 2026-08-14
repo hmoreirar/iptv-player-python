@@ -3,7 +3,7 @@ import sys
 
 os.environ.setdefault("QT_QPA_PLATFORM", "xcb")
 
-from PySide6.QtCore import QSize, Qt, QUrl, QSettings, QTimer
+from PySide6.QtCore import QSize, Qt, QUrl, QSettings, QTimer, QShortcut
 from PySide6.QtGui import QIcon, QPixmap
 from PySide6.QtNetwork import QNetworkAccessManager, QNetworkReply, QNetworkRequest
 from PySide6.QtWidgets import (
@@ -215,11 +215,9 @@ class IPTVPlayer(QMainWindow):
 
         self.play_button = QPushButton("▶ Reproducir")
         self.play_button.setEnabled(False)
-        self.play_button.setShortcut("Space")
         self.play_button.clicked.connect(self.toggle_play_pause)
 
         self.mute_button = QPushButton("🔊")
-        self.mute_button.setShortcut("M")
         self.mute_button.clicked.connect(self.toggle_mute)
 
         self.volume_slider = QSlider(Qt.Horizontal)
@@ -229,7 +227,6 @@ class IPTVPlayer(QMainWindow):
         self.volume_slider.valueChanged.connect(self.on_volume_changed)
 
         fullscreen_button = QPushButton("⛶ Pantalla completa")
-        fullscreen_button.setShortcut("F11")
         fullscreen_button.clicked.connect(self.toggle_fullscreen)
 
         controls_layout.addWidget(self.play_button)
@@ -277,6 +274,15 @@ class IPTVPlayer(QMainWindow):
         self.tv_mode.volume_changed.connect(self.on_tv_volume_changed)
         self.tv_mode.mute_requested.connect(self.toggle_mute)
         self.tv_mode.exited.connect(self.on_tv_exited)
+
+        # -------------------------
+        # ATAJOS DE TECLADO
+        # -------------------------
+
+        QShortcut("Space", self, self.toggle_play_pause)
+        QShortcut("M", self, self.toggle_mute)
+        QShortcut("F11", self, self.toggle_fullscreen)
+        QShortcut("Escape", self, self._on_escape)
 
     # =========================
     # ABRIR PLAYLISTS
@@ -565,6 +571,12 @@ class IPTVPlayer(QMainWindow):
             self.showNormal()
         else:
             self.showFullScreen()
+
+    def _on_escape(self):
+        if self.isFullScreen():
+            self.showNormal()
+        elif self.tv_button.isChecked():
+            self.tv_mode.exit()
 
     # =========================
     # MODO TV
