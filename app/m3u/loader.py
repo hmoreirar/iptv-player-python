@@ -14,15 +14,24 @@ class PlaylistLoader(QThread):
         super().__init__()
         self.source = source
         self.is_url = is_url
+        self._abort = False
+
+    def abort(self):
+        self._abort = True
 
     def run(self):
         try:
+            if self._abort:
+                return
+
             if self.is_url:
                 channels = parse_m3u_url(self.source)
             else:
                 channels = parse_m3u_file(self.source)
         except Exception as error:
-            self.failed.emit(str(error))
+            if not self._abort:
+                self.failed.emit(str(error))
             return
 
-        self.finished.emit(channels)
+        if not self._abort:
+            self.finished.emit(channels)

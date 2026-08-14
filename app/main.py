@@ -94,7 +94,7 @@ class IPTVPlayer(QMainWindow):
         self.setup_ui()
         self._load_settings()
 
-        QTimer.singleShot(0, self._auto_load_last)
+        QTimer.singleShot(1000, self._auto_load_last)
 
     # =========================
     # INTERFAZ
@@ -302,6 +302,11 @@ class IPTVPlayer(QMainWindow):
         self._start_loading(url.strip(), is_url=True)
 
     def _start_loading(self, source, is_url):
+        if self.loader and self.loader.isRunning():
+            self.loader.abort()
+            self.loader.wait(3000)
+            self.loader = None
+
         self.loading_label.setVisible(True)
         self.setEnabled(False)
         self.status_label.setText("")
@@ -707,12 +712,12 @@ class IPTVPlayer(QMainWindow):
     def closeEvent(self, event):
         self._save_settings()
 
+        if self.loader and self.loader.isRunning():
+            self.loader.abort()
+            self.loader.wait(3000)
+
         if self.player:
             self.player.destroy()
-
-        if self.loader and self.loader.isRunning():
-            self.loader.terminate()
-            self.loader.wait(1000)
 
         event.accept()
 
