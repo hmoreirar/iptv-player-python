@@ -1,6 +1,6 @@
 import sys
 
-from PySide6.QtCore import QSize, Qt, QUrl, QSettings
+from PySide6.QtCore import QSize, Qt, QUrl, QSettings, QTimer
 from PySide6.QtGui import QIcon, QPixmap
 from PySide6.QtNetwork import QNetworkAccessManager, QNetworkReply, QNetworkRequest
 from PySide6.QtWidgets import (
@@ -89,9 +89,12 @@ class IPTVPlayer(QMainWindow):
         self.player = None
         self.logo_loader = LogoLoader()
         self.category_buttons = {}
+        self.playlist_history = []
 
         self.setup_ui()
         self._load_settings()
+
+        QTimer.singleShot(0, self._auto_load_last)
 
     # =========================
     # INTERFAZ
@@ -138,12 +141,16 @@ class IPTVPlayer(QMainWindow):
         self.tv_button.setCheckable(True)
         self.tv_button.clicked.connect(self.toggle_tv_mode)
 
+        history_button = QPushButton("🕐 Historial")
+        history_button.clicked.connect(self.show_history)
+
         sidebar_layout.addWidget(title)
         sidebar_layout.addSpacing(20)
         sidebar_layout.addWidget(open_button)
         sidebar_layout.addWidget(url_button)
         sidebar_layout.addWidget(self.loading_label)
         sidebar_layout.addSpacing(20)
+        sidebar_layout.addWidget(history_button)
         sidebar_layout.addWidget(favorites_button)
         sidebar_layout.addWidget(all_button)
         sidebar_layout.addWidget(self.tv_button)
@@ -626,17 +633,72 @@ class IPTVPlayer(QMainWindow):
 
         self._last_source = self.settings.value("playlist/last_source", "")
         self._last_is_url = self.settings.value("playlist/last_is_url", False, type=bool)
+        self.playlist_history = self.settings.value("playlist/history", [], type=list)
 
     def _save_settings(self):
         self.settings.setValue("window/geometry", self.saveGeometry())
         self.settings.setValue("player/volume", self.volume_slider.value())
         self.settings.setValue("favorites/urls", list(self.favorites))
+        self.settings.setValue("playlist/history", self.playlist_history)
 
     def _save_playlist_source(self, source, is_url):
         self._last_source = source
         self._last_is_url = is_url
         self.settings.setValue("playlist/last_source", source)
         self.settings.setValue("playlist/last_is_url", is_url)
+
+        entry = f"{'[URL] ' if is_url else ''}{source}"
+        if entry in self.playlist_history:
+            self.playlist_history.remove(entry)
+        self.playlist_history.insert(0, entry)
+        self.playlist_history = self.playlist_history[:10]
+        self.settings.setValue("playlist/history", self.playlist_history)
+
+    # =========================
+    # HISTORIAL
+    # =========================
+
+    def show_history(self):
+        if not self.playlist_history:
+            QMessageBox.information(
+                self,
+                "Historial",
+                "No hay playlists en el historial.",
+            )
+            return
+
+        items = []
+        for entry in self.playlist_history:
+            items.append(entry)
+
+        item, ok = QInputDialog.getItem(
+            self,
+            "Historial de Playlists",
+            "Selecciona una playlist:",
+            items,
+            0,
+            False,
+        )
+
+        if ok and item:
+            is_url = item.startswith("[URL] ")
+            source = item[6:] if is_url else item
+            self._start_loading(source, is_url=is_url)
+
+    def _auto_load_last(self):
+        if not self._last_source:
+            return
+
+        reply = QMessageBox.question(
+            self,
+            "Cargar última playlist",
+            f"¿Deseas cargar la última playlist?\n\n{self._last_source}",
+            QMessageBox.Yes | QMessageBox.No,
+            QMessageBox.Yes,
+        )
+
+        if reply == QMessageBox.Yes:
+            self._start_loading(self._last_source, is_url=self._last_is_url)
 
     # =========================
     # CERRAR APLICACIÓN
