@@ -262,6 +262,7 @@ class IPTVPlayer(QMainWindow):
         self.tv_mode = TVMode(self.video, self)
         self.tv_mode.channel_selected.connect(self.on_tv_channel_selected)
         self.tv_mode.volume_changed.connect(self.on_tv_volume_changed)
+        self.tv_mode.mute_requested.connect(self.toggle_mute)
         self.tv_mode.exited.connect(self.on_tv_exited)
 
     # =========================

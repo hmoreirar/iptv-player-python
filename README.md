@@ -78,7 +78,21 @@ El ejecutable se genera en `dist/iptv-player/iptv-player`.
 3. Usar los controles de reproduccion (play/pause, volumen, pantalla completa).
 4. Navegar por categorias usando el panel lateral.
 5. Agregar canales a favoritos con clic derecho > Añadir a favoritos.
-6. Entrar al Modo TV con el boton correspondiente. Navegar con flechas del teclado o rueda del raton. Salir con Escape.
+6. Entrar al Modo TV con el boton correspondiente.
+
+### Controles del Modo TV
+
+| Tecla | Accion |
+|---|---|
+| Flecha arriba | Canal anterior |
+| Flecha abajo | Canal siguiente |
+| 0-9 | Ingresar numero de canal |
+| Enter | Confirmar numero / Mostrar guia |
+| Backspace | Volver al canal anterior |
+| M | Activar/desactivar mute |
+| Tab | Mostrar/ocultar guia de canales |
+| Izquierda/Derecha | Volumen |
+| Escape | Salir del modo TV |
 
 ## Estructura del proyecto
 

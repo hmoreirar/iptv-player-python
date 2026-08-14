@@ -1,13 +1,101 @@
 from PySide6.QtCore import QEvent, QObject, QSize, Qt, QTimer, Signal
-from PySide6.QtWidgets import QListWidget, QListWidgetItem
+from PySide6.QtGui import QFont, QPixmap
+from PySide6.QtWidgets import (
+    QHBoxLayout,
+    QLabel,
+    QListWidget,
+    QListWidgetItem,
+    QVBoxLayout,
+    QWidget,
+)
 
-SWITCH_DELAY_MS = 700
-HIDE_DELAY_MS = 2000
 VOLUME_STEP = 5
+BANNER_HIDE_MS = 3000
+NUMBER_TIMEOUT_MS = 1500
+
+
+class ChannelBanner(QWidget):
+    """Banner de información del canal en la parte inferior de la pantalla."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
+        self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(24, 0, 24, 20)
+
+        self.channel_info = QLabel()
+        self.channel_info.setStyleSheet(
+            "color: #ffffff; font-size: 20px; font-weight: bold;"
+        )
+
+        self.group_label = QLabel()
+        self.group_label.setStyleSheet("color: #cccccc; font-size: 14px;")
+
+        self.volume_label = QLabel()
+        self.volume_label.setStyleSheet("color: #aaaaaa; font-size: 14px;")
+        self.volume_label.hide()
+
+        self.input_label = QLabel()
+        self.input_label.setStyleSheet(
+            "color: #ffcc00; font-size: 28px; font-weight: bold;"
+        )
+        self.input_label.hide()
+
+        layout.addWidget(self.channel_info)
+        layout.addWidget(self.group_label)
+        layout.addWidget(self.volume_label)
+        layout.addWidget(self.input_label)
+
+        self.setStyleSheet(
+            """
+            ChannelBanner {
+                background-color: rgba(0, 0, 0, 0.7);
+                border-radius: 10px;
+            }
+            """
+        )
+
+        self._hide_timer = QTimer(self)
+        self._hide_timer.setSingleShot(True)
+        self._hide_timer.timeout.connect(self.hide)
+
+    def show_channel(self, index, total, channel):
+        self.channel_info.setText(
+            f"CH {index + 1}/{total}  —  {channel['name']}"
+        )
+
+        group = channel.get("group", "")
+        self.group_label.setText(group if group else "")
+        self.group_label.setVisible(bool(group))
+
+        self.volume_label.hide()
+        self.input_label.hide()
+
+        self.show()
+        self.raise_()
+        self._hide_timer.start(BANNER_HIDE_MS)
+
+    def show_volume(self, volume):
+        self.volume_label.setText(f"Volumen: {volume}")
+        self.volume_label.show()
+        self.show()
+        self.raise_()
+        self._hide_timer.start(BANNER_HIDE_MS)
+
+    def show_number_input(self, digits):
+        self.input_label.setText(f"Canal: {digits}_")
+        self.input_label.show()
+        self.show()
+        self.raise_()
+
+    def hide_number_input(self):
+        self.input_label.hide()
 
 
 class TVOverlay(QListWidget):
-    """Lista de canales semitransparente superpuesta al video."""
+    """Lista de canales semitransparente superpuesta al video (guía)."""
 
     def __init__(self, parent=None):
         super().__init__(parent)
@@ -18,15 +106,15 @@ class TVOverlay(QListWidget):
         self.setStyleSheet(
             """
             QListWidget {
-                background-color: rgba(0, 0, 0, 0.75);
-                border: 1px solid rgba(255, 255, 255, 0.2);
+                background-color: rgba(0, 0, 0, 0.80);
+                border: 1px solid rgba(255, 255, 255, 0.15);
                 border-radius: 8px;
                 color: #ffffff;
                 font-size: 14px;
                 outline: none;
             }
             QListWidget::item {
-                padding: 6px 10px;
+                padding: 8px 12px;
             }
             QListWidget::item:selected {
                 background-color: rgba(255, 255, 255, 0.25);
@@ -36,10 +124,22 @@ class TVOverlay(QListWidget):
 
 
 class TVMode(QObject):
-    """Modo TV: video a pantalla completa con lista de canales superpuesta."""
+    """Modo TV: experiencia real de televisión.
+
+    Controles:
+      - Flechas arriba/abajo: canal anterior/siguiente
+      - Flechas izquierda/derecha: volumen
+      - 0-9: entrada numérica de canal
+      - Enter: confirmar número ingresado
+      - Backspace: canal anterior
+      - M: mute
+      - Tab: guía de canales
+      - Escape: salir
+    """
 
     channel_selected = Signal(dict)
     volume_changed = Signal(int)
+    mute_requested = Signal()
     exited = Signal()
 
     def __init__(self, video_widget, parent=None):
@@ -51,16 +151,19 @@ class TVMode(QObject):
         self.logo_loader = None
         self.active = False
 
+        self._current_index = 0
+        self._previous_index = 0
+        self._number_buffer = ""
+
+        self.banner = ChannelBanner(self.video)
+        self.banner.hide()
+
         self.overlay = TVOverlay(self.video)
         self.overlay.hide()
 
-        self._switch_timer = QTimer(self)
-        self._switch_timer.setSingleShot(True)
-        self._switch_timer.timeout.connect(self._confirm_selection)
-
-        self._hide_timer = QTimer(self)
-        self._hide_timer.setSingleShot(True)
-        self._hide_timer.timeout.connect(self._hide_overlay)
+        self._number_timer = QTimer(self)
+        self._number_timer.setSingleShot(True)
+        self._number_timer.timeout.connect(self._execute_number_input)
 
     # =========================
     # ENTRAR / SALIR
@@ -75,15 +178,19 @@ class TVMode(QObject):
         self.current_url = current_url
         self.logo_loader = logo_loader
 
-        self._populate_overlay()
+        self._current_index = self._find_current_index()
+        self._previous_index = self._current_index
+        self._number_buffer = ""
+
+        self._place_banner()
         self._place_overlay()
+        self._populate_overlay()
 
         self.video.installEventFilter(self)
         self.video.setFocusPolicy(Qt.FocusPolicy.StrongFocus)
         self.video.setFocus()
 
-        self._show_overlay()
-        self._hide_timer.start(HIDE_DELAY_MS)
+        self._show_banner()
 
     def exit(self):
         if not self.active:
@@ -91,15 +198,14 @@ class TVMode(QObject):
 
         self.active = False
 
-        self._switch_timer.stop()
-        self._hide_timer.stop()
+        self._number_timer.stop()
 
         self.video.removeEventFilter(self)
         self.video.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.video.unsetCursor()
 
-        if self.overlay:
-            self.overlay.hide()
+        self.banner.hide()
+        self.overlay.hide()
 
         self.exited.emit()
 
@@ -114,6 +220,7 @@ class TVMode(QObject):
         event_type = event.type()
 
         if event_type == QEvent.Type.Resize:
+            self._place_banner()
             self._place_overlay()
             return False
 
@@ -122,9 +229,8 @@ class TVMode(QObject):
 
         if event_type == QEvent.Type.Wheel:
             delta = event.angleDelta().y()
-
             if delta:
-                self._move(1 if delta > 0 else -1)
+                self._change_channel(1 if delta > 0 else -1)
                 event.accept()
                 return True
 
@@ -134,131 +240,226 @@ class TVMode(QObject):
         key = event.key()
 
         if key == Qt.Key.Key_Up:
-            self._move(-1)
+            self._change_channel(-1)
             return True
 
         if key == Qt.Key.Key_Down:
-            self._move(1)
+            self._change_channel(1)
             return True
 
         if key == Qt.Key.Key_Left:
             self.volume_changed.emit(-VOLUME_STEP)
+            self._show_volume()
             return True
 
         if key == Qt.Key.Key_Right:
             self.volume_changed.emit(VOLUME_STEP)
+            self._show_volume()
             return True
 
         if key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
-            self._confirm_selection()
+            if self._number_buffer:
+                self._execute_number_input()
+            else:
+                self._toggle_guide()
+            return True
+
+        if key == Qt.Key.Key_Backspace:
+            self._go_to_previous()
+            return True
+
+        if key == Qt.Key.Key_M:
+            self.mute_requested.emit()
+            return True
+
+        if key == Qt.Key.Key_Tab:
+            self._toggle_guide()
             return True
 
         if key == Qt.Key.Key_Escape:
-            self.exit()
+            if self.overlay.isVisible():
+                self.overlay.hide()
+                self.video.setCursor(Qt.CursorShape.BlankCursor)
+            else:
+                self.exit()
+            return True
+
+        if Qt.Key.Key_0 <= key <= Qt.Key.Key_9:
+            digit = str(key - Qt.Key.Key_0)
+            self._add_digit(digit)
             return True
 
         return False
 
     # =========================
-    # NAVEGACIÓN
+    # CAMBIO DE CANAL
     # =========================
 
-    def _move(self, step):
-        if not self.overlay.isVisible():
-            self._show_overlay()
-
-        row = self.overlay.currentRow()
-        new_row = max(0, min(len(self.channels) - 1, row + step))
-
-        self.overlay.setCurrentRow(new_row)
-
-        current_item = self.overlay.currentItem()
-
-        if current_item:
-            self.overlay.scrollToItem(current_item)
-
-        self._switch_timer.start(SWITCH_DELAY_MS)
-        self._hide_timer.start(HIDE_DELAY_MS)
-
-    def _confirm_selection(self):
-        if not self.active:
+    def _change_channel(self, step):
+        if not self.channels:
             return
 
-        channel = self._current_selection()
+        self._previous_index = self._current_index
 
-        if channel is None:
+        new_index = self._current_index + step
+        if new_index < 0:
+            new_index = len(self.channels) - 1
+        elif new_index >= len(self.channels):
+            new_index = 0
+
+        self._current_index = new_index
+        self._emit_current()
+
+    def _go_to_previous(self):
+        if not self.channels:
             return
 
-        self.current_url = channel["url"]
-        self.channel_selected.emit(channel)
+        self._current_index = self._previous_index
+        self._emit_current()
 
-        self._show_overlay()
-        self._hide_timer.start(HIDE_DELAY_MS)
+    def _emit_current(self):
+        if 0 <= self._current_index < len(self.channels):
+            channel = self.channels[self._current_index]
+            self.current_url = channel["url"]
+            self._update_overlay_selection()
+            self.banner.show_channel(
+                self._current_index, len(self.channels), channel
+            )
+            self.channel_selected.emit(channel)
 
-    def _current_selection(self):
-        row = self.overlay.currentRow()
+    def _find_current_index(self):
+        if self.current_url is None:
+            return 0
 
-        if 0 <= row < len(self.channels):
-            return self.channels[row]
+        for i, ch in enumerate(self.channels):
+            if ch["url"] == self.current_url:
+                return i
 
-        return None
+        return 0
 
     # =========================
-    # OVERLAY
+    # ENTRADA NUMÉRICA
     # =========================
+
+    def _add_digit(self, digit):
+        if len(self._number_buffer) >= 3:
+            self._number_buffer = ""
+
+        self._number_buffer += digit
+
+        self._number_timer.stop()
+        self._number_timer.start(NUMBER_TIMEOUT_MS)
+
+        self.banner.show_number_input(self._number_buffer)
+
+    def _execute_number_input(self):
+        self._number_timer.stop()
+
+        if not self._number_buffer:
+            return
+
+        num = int(self._number_buffer)
+        self._number_buffer = ""
+
+        self.banner.hide_number_input()
+
+        if not self.channels:
+            return
+
+        index = num - 1
+        if index < 0:
+            index = 0
+        elif index >= len(self.channels):
+            index = len(self.channels) - 1
+
+        self._previous_index = self._current_index
+        self._current_index = index
+        self._emit_current()
+
+    # =========================
+    # VOLUMEN
+    # =========================
+
+    def _show_volume(self):
+        from PySide6.QtWidgets import QApplication
+
+        slider = None
+        for widget in QApplication.topLevelWidgets():
+            if hasattr(widget, "volume_slider"):
+                slider = widget.volume_slider
+                break
+
+        volume = slider.value() if slider else 0
+        self.banner.show_volume(volume)
+
+    # =========================
+    # GUÍA DE CANALES
+    # =========================
+
+    def _toggle_guide(self):
+        if self.overlay.isVisible():
+            self.overlay.hide()
+            self.video.setCursor(Qt.CursorShape.BlankCursor)
+        else:
+            self._populate_overlay()
+            self.overlay.show()
+            self.overlay.raise_()
+            self.video.setCursor(Qt.CursorShape.ArrowCursor)
 
     def _populate_overlay(self):
         self.overlay.clear()
 
-        for channel in self.channels:
-            item = QListWidgetItem(channel["name"])
+        for i, channel in enumerate(self.channels):
+            num = i + 1
+            item = QListWidgetItem(f"{num:>3}.  {channel['name']}")
             item.setData(Qt.ItemDataRole.UserRole, channel)
             self.overlay.addItem(item)
 
             logo = channel.get("logo", "")
-
             if logo and self.logo_loader:
                 self.logo_loader.load(item, logo)
 
-        row = self._row_for_url(self.current_url)
+        if 0 <= self._current_index < self.overlay.count():
+            self.overlay.setCurrentRow(self._current_index)
+            self.overlay.scrollToItem(self.overlay.currentItem())
 
-        if row >= 0:
-            self.overlay.setCurrentRow(row)
+    def _update_overlay_selection(self):
+        if self.overlay.isVisible() and 0 <= self._current_index < self.overlay.count():
+            self.overlay.setCurrentRow(self._current_index)
+            self.overlay.scrollToItem(self.overlay.currentItem())
 
-    def _row_for_url(self, url):
-        for index, channel in enumerate(self.channels):
-            if channel["url"] == url:
-                return index
+    # =========================
+    # POSICIONAMIENTO
+    # =========================
 
-        return -1
+    def _place_banner(self):
+        vw = self.video.width()
+        vh = self.video.height()
 
-    def _show_overlay(self):
-        if self.overlay.isHidden():
-            self.overlay.show()
-            self.overlay.raise_()
-
-        self.video.setCursor(Qt.CursorShape.ArrowCursor)
-
-    def _hide_overlay(self):
-        if self.overlay:
-            self.overlay.hide()
-
-        self.video.setCursor(Qt.CursorShape.BlankCursor)
-
-    def _place_overlay(self):
-        video_width = self.video.width()
-        video_height = self.video.height()
-
-        if video_width <= 0 or video_height <= 0:
+        if vw <= 0 or vh <= 0:
             return
 
-        width = min(380, int(video_width * 0.32))
+        width = min(400, int(vw * 0.35))
+        height = 90
+        x = 20
+        y = vh - height - 20
+
+        self.banner.setGeometry(x, y, width, height)
+
+    def _place_overlay(self):
+        vw = self.video.width()
+        vh = self.video.height()
+
+        if vw <= 0 or vh <= 0:
+            return
+
+        width = min(380, int(vw * 0.32))
         margin = 24
-        top = int(video_height * 0.12)
-        height = int(video_height * 0.62)
+        top = int(vh * 0.12)
+        height = int(vh * 0.62)
 
         self.overlay.setGeometry(
-            video_width - width - margin,
+            vw - width - margin,
             top,
             width,
             height,
