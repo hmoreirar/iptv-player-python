@@ -472,14 +472,22 @@ class IPTVPlayer(QMainWindow):
         if chosen == favorite_action:
             self.toggle_favorite(channel)
         elif chosen == play_action:
-            self.player.play(channel["url"])
-            self.current_url = channel["url"]
-            self.play_button.setText("⏸ Pausa")
-            self.play_button.setEnabled(True)
+            self._play_channel(channel)
 
     # =========================
     # REPRODUCCIÓN
     # =========================
+
+    def _play_channel(self, channel):
+        if channel is None:
+            return
+
+        self.current_url = channel["url"]
+        self.play_button.setText("⏸ Pausa")
+        self.play_button.setEnabled(True)
+
+        self.player.play(channel["url"])
+        self.status_label.setText(f"Reproduciendo: {channel['name']}")
 
     def play_selected_channel(self, item):
         channel = item.data(Qt.UserRole)
@@ -490,12 +498,7 @@ class IPTVPlayer(QMainWindow):
         if self.current_url == channel["url"]:
             return
 
-        self.current_url = channel["url"]
-        self.play_button.setText("⏸ Pausa")
-        self.play_button.setEnabled(True)
-
-        self.player.play(channel["url"])
-        self.status_label.setText(f"Reproduciendo: {channel['name']}")
+        self._play_channel(channel)
 
     def toggle_play_pause(self):
         if self.current_url is None:
@@ -559,12 +562,7 @@ class IPTVPlayer(QMainWindow):
         self._set_ui_visible(True)
 
     def on_tv_channel_selected(self, channel):
-        self.current_url = channel["url"]
-        self.play_button.setText("⏸ Pausa")
-        self.play_button.setEnabled(True)
-
-        self.player.play(channel["url"])
-        self.status_label.setText(f"Reproduciendo: {channel['name']}")
+        self._play_channel(channel)
 
     def on_tv_volume_changed(self, delta):
         value = max(0, min(100, self.volume_slider.value() + delta))
@@ -589,6 +587,8 @@ class IPTVPlayer(QMainWindow):
             self.content_layout.setSpacing(self._content_spacing)
 
     def on_playback_error(self, message):
+        self.current_url = None
+        self.play_button.setText("▶ Reproducir")
         self.play_button.setEnabled(False)
 
         QMessageBox.warning(self, "Error de reproducción", message)
