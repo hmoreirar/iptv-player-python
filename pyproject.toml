@@ -1,0 +1,31 @@
+[build-system]
+requires = ["setuptools>=66.0"]
+build-backend = "setuptools.backends._legacy:_Backend"
+
+[project]
+name = "iptv-player-python"
+version = "0.1.0"
+description = "Reproductor de IPTV de escritorio con PySide6 y mpv"
+readme = "README.md"
+license = "MIT"
+requires-python = ">=3.10"
+authors = [
+    { name = "Hector Moreira", email = "moreirarodriguez@gmail.com" },
+]
+dependencies = [
+    "PySide6>=6.5",
+    "python-mpv>=1.0",
+    "requests>=2.28",
+]
+
+[project.optional-dependencies]
+dev = [
+    "pytest>=7.0",
+]
+
+[project.scripts]
+iptv-player = "app.main:main"
+
+[tool.setuptools.packages.find]
+include = ["app*"]
+exclude = ["tests*"]

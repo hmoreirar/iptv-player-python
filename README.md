@@ -53,6 +53,24 @@ pip install -r requirements.txt
 python -m app.main
 ```
 
+## Tests
+
+```bash
+pip install -r requirements-dev.txt
+pytest tests/ -v
+```
+
+## Empaquetado
+
+Para generar un ejecutable standalone con PyInstaller:
+
+```bash
+pip install -r requirements-dev.txt
+pyinstaller iptv-player.spec --noconfirm
+```
+
+El ejecutable se genera en `dist/iptv-player/iptv-player`.
+
 ## Uso
 
 1. Abrir una playlist con el boton **Abrir M3U** (archivo local) o **Abrir URL** (desde Internet).
@@ -74,7 +92,12 @@ iptv-player-python/
       loader.py      # Carga asincrona de playlists
     player/
       mpv_player.py  # Wrapper de mpv
-  requirements.txt
+  tests/
+    test_parser.py   # Tests del parser M3U
+  pyproject.toml     # Metadata del proyecto
+  requirements.txt   # Dependencias de runtime
+  requirements-dev.txt # Dependencias de desarrollo
+  iptv-player.spec   # Configuracion de PyInstaller
 ```
 
 ## Licencia
