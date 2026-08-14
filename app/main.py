@@ -215,9 +215,11 @@ class IPTVPlayer(QMainWindow):
 
         self.play_button = QPushButton("▶ Reproducir")
         self.play_button.setEnabled(False)
+        self.play_button.setShortcut("Space")
         self.play_button.clicked.connect(self.toggle_play_pause)
 
         self.mute_button = QPushButton("🔊")
+        self.mute_button.setShortcut("M")
         self.mute_button.clicked.connect(self.toggle_mute)
 
         self.volume_slider = QSlider(Qt.Horizontal)
@@ -227,6 +229,7 @@ class IPTVPlayer(QMainWindow):
         self.volume_slider.valueChanged.connect(self.on_volume_changed)
 
         fullscreen_button = QPushButton("⛶ Pantalla completa")
+        fullscreen_button.setShortcut("F11")
         fullscreen_button.clicked.connect(self.toggle_fullscreen)
 
         controls_layout.addWidget(self.play_button)

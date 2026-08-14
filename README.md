@@ -80,6 +80,14 @@ El ejecutable se genera en `dist/iptv-player/iptv-player`.
 5. Agregar canales a favoritos con clic derecho > Añadir a favoritos.
 6. Entrar al Modo TV con el boton correspondiente.
 
+### Atajos de teclado (modo normal)
+
+| Tecla | Accion |
+|---|---|
+| Space | Reproducir / Pausar |
+| M | Activar/desactivar mute |
+| F11 | Pantalla completa |
+
 ### Controles del Modo TV
 
 | Tecla | Accion |
