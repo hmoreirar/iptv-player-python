@@ -192,6 +192,13 @@ class TVMode(QObject):
 
         self._show_banner()
 
+    def _show_banner(self):
+        if 0 <= self._current_index < len(self.channels):
+            channel = self.channels[self._current_index]
+            self.banner.show_channel(
+                self._current_index, len(self.channels), channel
+            )
+
     def exit(self):
         if not self.active:
             return
