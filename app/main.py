@@ -3,8 +3,8 @@ import sys
 
 os.environ.setdefault("QT_QPA_PLATFORM", "xcb")
 
-from PySide6.QtCore import QSize, Qt, QUrl, QSettings, QTimer, QShortcut
-from PySide6.QtGui import QIcon, QPixmap
+from PySide6.QtCore import QSize, Qt, QUrl, QSettings, QTimer
+from PySide6.QtGui import QIcon, QPixmap, QShortcut
 from PySide6.QtNetwork import QNetworkAccessManager, QNetworkReply, QNetworkRequest
 from PySide6.QtWidgets import (
     QApplication,
