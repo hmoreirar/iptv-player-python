@@ -20,7 +20,8 @@ class MPVPlayer(QObject):
 
         self.player = mpv.MPV(
             wid=str(wid),
-            vo="x11",
+            vo="gpu",
+            gpu_context="x11",
             hwdec="auto",
             osc="no",
             input_default_bindings=True,
