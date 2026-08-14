@@ -256,11 +256,10 @@ class IPTVPlayer(QMainWindow):
         main_layout.addWidget(content)
 
         # -------------------------
-        # MPV
+        # MPV (init diferida - ver showEvent)
         # -------------------------
 
-        self.player = MPVPlayer(self.video.winId())
-        self.player.error_occurred.connect(self.on_playback_error)
+        self.player = None
 
         # -------------------------
         # MODO TV
@@ -506,7 +505,7 @@ class IPTVPlayer(QMainWindow):
     # =========================
 
     def _play_channel(self, channel):
-        if channel is None:
+        if channel is None or self.player is None:
             return
 
         self.current_url = channel["url"]
@@ -528,7 +527,7 @@ class IPTVPlayer(QMainWindow):
         self._play_channel(channel)
 
     def toggle_play_pause(self):
-        if self.current_url is None:
+        if self.current_url is None or self.player is None:
             return
 
         self.player.toggle_pause()
@@ -539,10 +538,14 @@ class IPTVPlayer(QMainWindow):
             self.play_button.setText("⏸ Pausa")
 
     def on_volume_changed(self, value):
-        self.player.set_volume(value)
+        if self.player is not None:
+            self.player.set_volume(value)
         self.settings.setValue("player/volume", value)
 
     def toggle_mute(self):
+        if self.player is None:
+            return
+
         self.player.toggle_mute()
 
         if self.player.is_muted():
@@ -704,6 +707,17 @@ class IPTVPlayer(QMainWindow):
 
         if reply == QMessageBox.Yes:
             self._start_loading(self._last_source, is_url=self._last_is_url)
+
+    # =========================
+    # INICIALIZACIÓN DIFERIDA
+    # =========================
+
+    def showEvent(self, event):
+        super().showEvent(event)
+
+        if self.player is None:
+            self.player = MPVPlayer(self.video.winId())
+            self.player.error_occurred.connect(self.on_playback_error)
 
     # =========================
     # CERRAR APLICACIÓN
