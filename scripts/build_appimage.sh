@@ -26,7 +26,11 @@ mkdir -p \
     "$APPDIR/usr/bin" \
     "$APPDIR/usr/lib/iptv-player" \
     "$APPDIR/usr/share/applications" \
-    "$APPDIR/usr/share/icons/hicolor/scalable/apps"
+    "$APPDIR/usr/share/icons/hicolor/scalable/apps" \
+    "$APPDIR/usr/share/doc/iptv-player"
+
+cp "$ROOT/LICENSE" "$ROOT/THIRD_PARTY_NOTICES.md" \
+    "$APPDIR/usr/share/doc/iptv-player/"
 
 cp -a "$ROOT/dist/iptv-player/." "$APPDIR/usr/lib/iptv-player/"
 
