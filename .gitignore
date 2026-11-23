@@ -6,6 +6,7 @@ __pycache__/
 
 .pytest_cache/
 .mypy_cache/
+.ruff_cache/
 htmlcov/
 .coverage
 
@@ -19,3 +20,15 @@ dist/
 
 .DS_Store
 Thumbs.db
+
+# Proceso de diseño local
+.impeccable/
+
+# Capturas temporales de mpv
+mpv-shot*.jpg
+
+# Herramientas y artefactos de empaquetado
+.tools/
+dist-appimage/
+AppDir/
+*.AppImage
