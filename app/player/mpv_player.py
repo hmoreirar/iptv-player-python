@@ -9,6 +9,7 @@ from PySide6.QtCore import QObject, Signal
 
 class MPVPlayer(QObject):
     error_occurred = Signal(str)
+    file_loaded = Signal()
 
     def __init__(self, wid):
         super().__init__()
@@ -23,22 +24,44 @@ class MPVPlayer(QObject):
             vo="xv",
             hwdec="auto",
             osc="no",
-            input_default_bindings=True,
-            input_vo_keyboard=True,
+            input_default_bindings=False,
+            input_vo_keyboard=False,
         )
 
         @self.player.event_callback("end-file")
         def _on_end_file(event):
             data = event.data
 
-            if data is not None and getattr(data, "reason", None) == mpv.MpvEventEndFile.ERROR:
+            if data is not None and (
+                getattr(data, "reason", None) == mpv.MpvEventEndFile.ERROR
+            ):
                 self.error_occurred.emit(
                     "No se pudo reproducir el canal.\n"
                     "Verifica la URL o tu conexión a internet."
                 )
 
-    def play(self, url):
+        @self.player.event_callback("file-loaded")
+        def _on_file_loaded(event):
+            self.file_loaded.emit()
+
+    def play(self, url, headers=None):
+        self._set_headers(headers)
         self.player.play(url)
+
+    def _set_headers(self, headers):
+        fields = [f"{key}: {value}" for key, value in (headers or {}).items()]
+
+        try:
+            self.player.http_header_fields = fields
+        except Exception:
+            try:
+                self.player.command(
+                    "set",
+                    "http-header-fields",
+                    ",".join(fields),
+                )
+            except Exception:
+                pass
 
     def stop(self):
         self.player.stop()

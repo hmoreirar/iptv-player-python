@@ -202,3 +202,116 @@ class TestEdgeCases:
         channels = parse_m3u_content(content)
 
         assert channels[0]["url"] == "rtmp://stream.example.com/live/canal"
+
+
+class TestHeaders:
+    def test_headers_empty_by_default(self):
+        content = textwrap.dedent("""\
+            #EXTM3U
+            #EXTINF:-1,Canal
+            http://stream.example.com/canal
+        """)
+        channels = parse_m3u_content(content)
+
+        assert channels[0]["headers"] == {}
+        assert channels[0]["id"] == ""
+
+    def test_tvg_id(self):
+        content = textwrap.dedent("""\
+            #EXTM3U
+            #EXTINF:-1 tvg-id="Canal.test@SD" group-title="News",Canal
+            http://stream.example.com/canal
+        """)
+        channels = parse_m3u_content(content)
+
+        assert channels[0]["id"] == "Canal.test@SD"
+
+    def test_multiple_groups_split(self):
+        content = textwrap.dedent("""\
+            #EXTM3U
+            #EXTINF:-1 group-title="Animation;Kids;Religious",Canal
+            http://stream.example.com/canal
+        """)
+        channels = parse_m3u_content(content)
+
+        assert channels[0]["group"] == "Animation"
+        assert channels[0]["groups"] == ["Animation", "Kids", "Religious"]
+
+    def test_user_agent_and_referrer_attributes(self):
+        content = textwrap.dedent("""\
+            #EXTM3U
+            #EXTINF:-1 http-user-agent="Mozilla/5.0 Test" http-referrer="http://example.com/ref",Canal
+            http://stream.example.com/canal
+        """)
+        channels = parse_m3u_content(content)
+
+        assert channels[0]["headers"] == {
+            "User-Agent": "Mozilla/5.0 Test",
+            "Referer": "http://example.com/ref",
+        }
+
+    def test_extvlcopt_headers(self):
+        content = textwrap.dedent("""\
+            #EXTM3U
+            #EXTINF:-1,Canal
+            #EXTVLCOPT:http-user-agent=Mozilla/5.0 VLC
+            #EXTVLCOPT:http-referrer=http://example.com/vlc
+            http://stream.example.com/canal
+        """)
+        channels = parse_m3u_content(content)
+
+        assert channels[0]["headers"]["User-Agent"] == "Mozilla/5.0 VLC"
+        assert channels[0]["headers"]["Referer"] == "http://example.com/vlc"
+
+    def test_attribute_wins_over_extvlcopt(self):
+        content = textwrap.dedent("""\
+            #EXTM3U
+            #EXTINF:-1 http-user-agent="Mozilla/5.0 Attr",Canal
+            #EXTVLCOPT:http-user-agent=Mozilla/5.0 Vlc
+            http://stream.example.com/canal
+        """)
+        channels = parse_m3u_content(content)
+
+        assert channels[0]["headers"]["User-Agent"] == "Mozilla/5.0 Attr"
+
+    def test_exthttp_json(self):
+        content = textwrap.dedent("""\
+            #EXTM3U
+            #EXTINF:-1,Canal
+            #EXTHTTP:{"User-Agent": "Mozilla/5.0 Json", "Referer": "http://example.com/json", "Cookie": "a=1"}
+            http://stream.example.com/canal
+        """)
+        channels = parse_m3u_content(content)
+
+        assert channels[0]["headers"] == {
+            "User-Agent": "Mozilla/5.0 Json",
+            "Referer": "http://example.com/json",
+            "Cookie": "a=1",
+        }
+
+    def test_duplicate_url_keeps_first_headers(self):
+        content = textwrap.dedent("""\
+            #EXTM3U
+            #EXTINF:-1 http-user-agent="First",Canal
+            http://stream.example.com/canal
+            #EXTINF:-1 http-user-agent="Second",Canal HD
+            http://stream.example.com/canal
+        """)
+        channels = parse_m3u_content(content)
+
+        assert len(channels) == 1
+        assert channels[0]["headers"]["User-Agent"] == "First"
+
+    def test_name_with_comma_inside_user_agent(self):
+        content = textwrap.dedent("""\
+            #EXTM3U
+            #EXTINF:-1 http-user-agent="Mozilla/5.0 (KHTML, like Gecko)" group-title="News",Canal, HD
+            http://stream.example.com/canal
+        """)
+        channels = parse_m3u_content(content)
+
+        assert channels[0]["name"] == "Canal, HD"
+        assert (
+            channels[0]["headers"]["User-Agent"]
+            == "Mozilla/5.0 (KHTML, like Gecko)"
+        )

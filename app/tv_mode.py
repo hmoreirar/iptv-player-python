@@ -1,7 +1,13 @@
-from PySide6.QtCore import QEvent, QObject, QPropertyAnimation, QSize, Qt, QTimer, Signal
-from PySide6.QtGui import QColor, QPainter, QPen
+from PySide6.QtCore import (
+    QEvent,
+    QObject,
+    QPoint,
+    QSize,
+    Qt,
+    QTimer,
+    Signal,
+)
 from PySide6.QtWidgets import (
-    QApplication,
     QHBoxLayout,
     QLabel,
     QListWidget,
@@ -9,6 +15,8 @@ from PySide6.QtWidgets import (
     QVBoxLayout,
     QWidget,
 )
+
+from app.ui.theme import Colors
 
 VOLUME_STEP = 5
 BANNER_HIDE_MS = 3000
@@ -23,39 +31,56 @@ class ChannelBanner(QWidget):
         super().__init__(parent)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
 
         layout = QVBoxLayout(self)
-        layout.setContentsMargins(24, 0, 24, 20)
+        layout.setContentsMargins(24, 14, 24, 16)
 
         self.channel_info = QLabel()
         self.channel_info.setStyleSheet(
-            "color: #ffffff; font-size: 20px; font-weight: bold;"
+            f"background: transparent; color: {Colors.text}; "
+            "font-size: 19px; font-weight: 700;"
         )
 
         self.group_label = QLabel()
-        self.group_label.setStyleSheet("color: #cccccc; font-size: 14px;")
+        self.group_label.setStyleSheet(
+            f"background: transparent; color: {Colors.muted}; font-size: 12px;"
+        )
 
         self.volume_label = QLabel()
-        self.volume_label.setStyleSheet("color: #aaaaaa; font-size: 14px;")
+        self.volume_label.setStyleSheet(
+            f"background: transparent; color: {Colors.accent}; "
+            "font-size: 13px; font-weight: 700;"
+        )
         self.volume_label.hide()
 
         self.input_label = QLabel()
         self.input_label.setStyleSheet(
-            "color: #ffcc00; font-size: 28px; font-weight: bold;"
+            f"background: transparent; color: {Colors.accent}; "
+            "font-size: 26px; font-weight: 700;"
         )
         self.input_label.hide()
+
+        self.hint_label = QLabel("ESC: salir del modo TV")
+        self.hint_label.setStyleSheet(
+            f"background: transparent; color: {Colors.muted_2}; font-size: 11px;"
+        )
 
         layout.addWidget(self.channel_info)
         layout.addWidget(self.group_label)
         layout.addWidget(self.volume_label)
         layout.addWidget(self.input_label)
+        layout.addWidget(self.hint_label)
 
         self.setStyleSheet(
-            """
-            ChannelBanner {
-                background-color: rgba(0, 0, 0, 0.7);
+            f"""
+            ChannelBanner {{
+                background-color: {Colors.surface};
+                border: 1px solid {Colors.border_strong};
                 border-radius: 10px;
-            }
+            }}
             """
         )
 
@@ -92,6 +117,26 @@ class ChannelBanner(QWidget):
     def hide_number_input(self):
         self.input_label.hide()
 
+    def show_error(self, message):
+        self.channel_info.setText("Error de reproduccion")
+        self.group_label.setText(message)
+        self.group_label.setVisible(True)
+        self.volume_label.hide()
+        self.input_label.hide()
+        self.show()
+        self.raise_()
+        self._hide_timer.start(BANNER_HIDE_MS * 2)
+
+    def show_status(self, title, detail):
+        self.channel_info.setText(title or "Favorito")
+        self.group_label.setText(detail)
+        self.group_label.setVisible(True)
+        self.volume_label.hide()
+        self.input_label.hide()
+        self.show()
+        self.raise_()
+        self._hide_timer.start(BANNER_HIDE_MS)
+
 
 class ChannelSidebar(QWidget):
     """Sidebar lateral estilo smart TV con lista de canales."""
@@ -100,15 +145,34 @@ class ChannelSidebar(QWidget):
         super().__init__(parent)
         self.setFocusPolicy(Qt.FocusPolicy.NoFocus)
         self.setAttribute(Qt.WidgetAttribute.WA_TransparentForMouseEvents)
+        self.setAttribute(Qt.WidgetAttribute.WA_StyledBackground, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_TranslucentBackground, True)
+        self.setAttribute(Qt.WidgetAttribute.WA_ShowWithoutActivating, True)
 
         layout = QVBoxLayout(self)
         layout.setContentsMargins(0, 0, 0, 0)
 
-        header = QLabel("  Canales")
+        header = QWidget()
         header.setStyleSheet(
-            "color: #ffffff; font-size: 16px; font-weight: bold; "
-            "padding: 12px 16px; background-color: rgba(0, 0, 0, 0.85);"
+            f"background-color: rgba(17, 24, 32, 0.96); "
+            f"border-bottom: 1px solid {Colors.border};"
         )
+        header_layout = QHBoxLayout(header)
+        header_layout.setContentsMargins(16, 12, 16, 12)
+
+        header_title = QLabel("CANALES")
+        header_title.setStyleSheet(
+            f"color: {Colors.muted_2}; font-size: 10px; font-weight: 700; "
+            "letter-spacing: 1px;"
+        )
+        header_hint = QLabel("ESC: salir")
+        header_hint.setStyleSheet(
+            f"color: {Colors.muted_2}; font-size: 10px;"
+        )
+        header_layout.addWidget(header_title)
+        header_layout.addStretch()
+        header_layout.addWidget(header_hint)
+
         layout.addWidget(header)
 
         self.channel_list = QListWidget()
@@ -117,22 +181,23 @@ class ChannelSidebar(QWidget):
             Qt.ScrollBarPolicy.ScrollBarAlwaysOff
         )
         self.channel_list.setStyleSheet(
-            """
-            QListWidget {
-                background-color: rgba(0, 0, 0, 0.82);
+            f"""
+            QListWidget {{
+                background-color: rgba(11, 15, 20, 0.95);
                 border: none;
-                color: #ffffff;
-                font-size: 14px;
+                color: {Colors.text};
+                font-size: 13px;
                 outline: none;
                 padding: 4px 0;
-            }
-            QListWidget::item {
+            }}
+            QListWidget::item {{
                 padding: 10px 16px;
-                border-bottom: 1px solid rgba(255, 255, 255, 0.06);
-            }
-            QListWidget::item:selected {
-                background-color: rgba(60, 130, 246, 0.6);
-            }
+                border-bottom: 1px solid {Colors.border};
+            }}
+            QListWidget::item:selected {{
+                background-color: rgba(240, 180, 41, 0.20);
+                color: {Colors.text};
+            }}
             """
         )
         layout.addWidget(self.channel_list)
@@ -140,6 +205,14 @@ class ChannelSidebar(QWidget):
         self._hide_timer = QTimer(self)
         self._hide_timer.setSingleShot(True)
         self._hide_timer.timeout.connect(self.fade_out)
+
+        self._logo_loader = None
+        self._logo_timer = QTimer(self)
+        self._logo_timer.setSingleShot(True)
+        self._logo_timer.timeout.connect(self._load_visible_logos)
+        self.channel_list.verticalScrollBar().valueChanged.connect(
+            lambda _value: self._schedule_logos()
+        )
 
         self.setStyleSheet(
             """
@@ -152,6 +225,8 @@ class ChannelSidebar(QWidget):
 
     def populate(self, channels, current_index, logo_loader=None):
         self.channel_list.clear()
+        self._logo_loader = logo_loader
+
         for i, ch in enumerate(channels):
             num = i + 1
             item = QListWidgetItem(f"  {num:>3}   {ch['name']}")
@@ -159,11 +234,44 @@ class ChannelSidebar(QWidget):
             item.setSizeHint(QSize(0, 42))
             self.channel_list.addItem(item)
 
-            logo = ch.get("logo", "")
-            if logo and logo_loader:
-                logo_loader.load(item, logo)
-
         self._select_index(current_index)
+        self._schedule_logos()
+
+    def _schedule_logos(self):
+        if self._logo_loader is not None:
+            self._logo_timer.start(120)
+
+    def _load_visible_logos(self):
+        if self._logo_loader is None:
+            return
+
+        viewport = self.channel_list.viewport()
+        top = self.channel_list.indexAt(QPoint(0, 0))
+        bottom = self.channel_list.indexAt(
+            QPoint(0, max(0, viewport.height() - 1))
+        )
+
+        if not top.isValid():
+            return
+
+        start = top.row()
+        end = bottom.row() if bottom.isValid() else start
+
+        for row in range(max(0, start - 1), min(self.channel_list.count(), end + 2)):
+            item = self.channel_list.item(row)
+
+            if item is None:
+                continue
+
+            channel = item.data(Qt.ItemDataRole.UserRole)
+
+            if not channel:
+                continue
+
+            logo = channel.get("logo", "")
+
+            if logo:
+                self._logo_loader.load(item, logo)
 
     def _select_index(self, index):
         if 0 <= index < self.channel_list.count():
@@ -178,11 +286,13 @@ class ChannelSidebar(QWidget):
         self.show()
         self.raise_()
         self._hide_timer.start(SIDEBAR_HIDE_MS)
+        self._schedule_logos()
 
     def show_and_start_hide_timer(self):
         self.show()
         self.raise_()
         self._hide_timer.start(SIDEBAR_HIDE_MS)
+        self._schedule_logos()
 
     def fade_out(self):
         self.hide()
@@ -205,12 +315,13 @@ class TVMode(QObject):
       - Backspace: canal anterior
       - M: mute
       - Tab: toggle sidebar
-      - Escape: cerrar sidebar / salir
+      - Escape: salir del modo TV
     """
 
     channel_selected = Signal(dict)
     volume_changed = Signal(int)
     mute_requested = Signal()
+    favorite_requested = Signal()
     exited = Signal()
 
     def __init__(self, video_widget, parent=None):
@@ -226,10 +337,22 @@ class TVMode(QObject):
         self._previous_index = 0
         self._number_buffer = ""
 
-        self.banner = ChannelBanner(self.video)
+        self.banner = ChannelBanner()
+        self.banner.setParent(
+            self.video.window(),
+            Qt.WindowType.Tool
+            | Qt.WindowType.FramelessWindowHint
+            | Qt.WindowType.NoDropShadowWindowHint,
+        )
         self.banner.hide()
 
-        self.sidebar = ChannelSidebar(self.video)
+        self.sidebar = ChannelSidebar()
+        self.sidebar.setParent(
+            self.video.window(),
+            Qt.WindowType.Tool
+            | Qt.WindowType.FramelessWindowHint
+            | Qt.WindowType.NoDropShadowWindowHint,
+        )
         self.sidebar.hide()
 
         self._number_timer = QTimer(self)
@@ -262,6 +385,27 @@ class TVMode(QObject):
 
         self._show_banner()
         self.sidebar.show_and_start_hide_timer()
+        self.banner.raise_()
+        QTimer.singleShot(200, self._place_widgets)
+
+    def _show_banner(self):
+        if 0 <= self._current_index < len(self.channels):
+            channel = self.channels[self._current_index]
+            self.banner.show_channel(
+                self._current_index, len(self.channels), channel
+            )
+
+    def show_error(self, message):
+        self.banner.show_error(message)
+
+    def show_volume(self, volume):
+        self.banner.show_volume(volume)
+
+    def show_status(self, title, detail):
+        self.banner.show_status(title, detail)
+
+    def next_channel(self):
+        self._change_channel(1)
 
     def exit(self):
         if not self.active:
@@ -319,12 +463,10 @@ class TVMode(QObject):
 
         if key == Qt.Key.Key_Left:
             self.volume_changed.emit(-VOLUME_STEP)
-            self._show_volume()
             return True
 
         if key == Qt.Key.Key_Right:
             self.volume_changed.emit(VOLUME_STEP)
-            self._show_volume()
             return True
 
         if key in (Qt.Key.Key_Return, Qt.Key.Key_Enter):
@@ -342,16 +484,16 @@ class TVMode(QObject):
             self.mute_requested.emit()
             return True
 
+        if key == Qt.Key.Key_F:
+            self.favorite_requested.emit()
+            return True
+
         if key == Qt.Key.Key_Tab:
             self._toggle_sidebar()
             return True
 
         if key == Qt.Key.Key_Escape:
-            if self.sidebar.isVisible():
-                self.sidebar.hide()
-                self.video.setCursor(Qt.CursorShape.BlankCursor)
-            else:
-                self.exit()
+            self.exit()
             return True
 
         if Qt.Key.Key_0 <= key <= Qt.Key.Key_9:
@@ -386,6 +528,16 @@ class TVMode(QObject):
 
         self._current_index = self._previous_index
         self._emit_current()
+
+    def sync_url(self, url):
+        """Sincroniza la seleccion tras elegir un canal en la guia."""
+        for i, channel in enumerate(self.channels):
+            if channel["url"] == url:
+                self._current_index = i
+                self.current_url = url
+                self.sidebar.update_selection(i)
+                self.banner.show_channel(i, len(self.channels), channel)
+                return
 
     def _emit_current(self):
         if 0 <= self._current_index < len(self.channels):
@@ -447,20 +599,6 @@ class TVMode(QObject):
         self._emit_current()
 
     # =========================
-    # VOLUMEN
-    # =========================
-
-    def _show_volume(self):
-        slider = None
-        for widget in QApplication.topLevelWidgets():
-            if hasattr(widget, "volume_slider"):
-                slider = widget.volume_slider
-                break
-
-        volume = slider.value() if slider else 0
-        self.banner.show_volume(volume)
-
-    # =========================
     # SIDEBAR
     # =========================
 
@@ -483,8 +621,16 @@ class TVMode(QObject):
         if vw <= 0 or vh <= 0:
             return
 
+        origin = self.video.mapToGlobal(QPoint(0, 0))
         self.sidebar.place(vw, vh)
+        self.sidebar.move(origin)
 
-        banner_w = min(400, int(vw * 0.35))
-        banner_h = 90
-        self.banner.setGeometry(20, vh - banner_h - 20, banner_w, banner_h)
+        banner_w = min(560, max(360, int(vw * 0.45)))
+        banner_h = 112
+
+        self.banner.setGeometry(
+            origin.x() + (vw - banner_w) // 2,
+            origin.y() + vh - banner_h - 24,
+            banner_w,
+            banner_h,
+        )
