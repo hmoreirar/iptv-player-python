@@ -1,25 +1,30 @@
 # -*- mode: python ; coding: utf-8 -*-
 
-import os
-import sys
 from pathlib import Path
 
 block_cipher = None
 
 project_root = Path(SPECPATH)
-site_packages = project_root / ".venv" / "lib" / "python3.11" / "site-packages"
+assets = project_root / "app" / "ui" / "assets"
 
 a = Analysis(
     [str(project_root / "app" / "main.py")],
     pathex=[str(project_root)],
     binaries=[],
-    datas=[],
+    datas=[(str(assets), "app/ui/assets")],
     hiddenimports=[
         "mpv",
-        "app.m3u.parser",
+        "PySide6.QtSvg",
+        "app.favorites",
+        "app.m3u.cache",
+        "app.m3u.iptv_org",
         "app.m3u.loader",
+        "app.m3u.parser",
         "app.player.mpv_player",
         "app.tv_mode",
+        "app.ui.icons",
+        "app.ui.theme",
+        "app.ui.widgets",
     ],
     hookspath=[],
     hooksconfig={},

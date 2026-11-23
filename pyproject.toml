@@ -4,13 +4,23 @@ build-backend = "setuptools.backends._legacy:_Backend"
 
 [project]
 name = "iptv-player-python"
-version = "0.1.0"
+version = "1.0.0"
 description = "Reproductor de IPTV de escritorio con PySide6 y mpv"
 readme = "README.md"
 license = "MIT"
+license-files = ["LICENSE"]
 requires-python = ">=3.10"
 authors = [
     { name = "Hector Moreira", email = "moreirarodriguez@gmail.com" },
+]
+classifiers = [
+    "Development Status :: 5 - Production/Stable",
+    "Environment :: X11 Applications :: Qt",
+    "Intended Audience :: End Users/Desktop",
+    "License :: OSI Approved :: MIT License",
+    "Operating System :: POSIX :: Linux",
+    "Programming Language :: Python :: 3",
+    "Topic :: Multimedia :: Video :: Display",
 ]
 dependencies = [
     "PySide6>=6.5",
@@ -21,7 +31,13 @@ dependencies = [
 [project.optional-dependencies]
 dev = [
     "pytest>=7.0",
+    "ruff>=0.6",
+    "pyinstaller>=6.0",
 ]
+
+[project.urls]
+Repository = "https://github.com/hmoreirar/iptv-player-python"
+Issues = "https://github.com/hmoreirar/iptv-player-python/issues"
 
 [project.scripts]
 iptv-player = "app.main:main"
